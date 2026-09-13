@@ -3,13 +3,15 @@ import {
     DefaultJobQueuePlugin,
     DefaultSchedulerPlugin,
     DefaultSearchPlugin,
+    defaultPromotionActions,
+    defaultPromotionConditions,
     VendureConfig,
 } from '@vendure/core';
 import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@vendure/email-plugin';
 import { AssetServerPlugin } from '@vendure/asset-server-plugin';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
-import { CuponsPlugin } from './plugins/cupons';
+import { CuponsPlugin, freteGratis, pedidoMinimoFreteGratis } from './plugins/cupons';
 import 'dotenv/config';
 import path from 'path';
 
@@ -59,6 +61,10 @@ export const config: VendureConfig = {
         migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
         logging: false,
         database: path.join(__dirname, '../vendure.sqlite'),
+    },
+    promotionOptions: {
+        promotionActions: [...defaultPromotionActions, freteGratis],
+        promotionConditions: [...defaultPromotionConditions, pedidoMinimoFreteGratis],
     },
     paymentOptions: {
         paymentMethodHandlers: [dummyPaymentHandler],

@@ -14,7 +14,8 @@ export function aplicarDesconto(valorCentavos: number, pct: number): number {
   return Math.round(valorCentavos - (valorCentavos * pct) / 100);
 }
 
-export function frete(valorCentavos: number): number {
+export function frete(valorCentavos: number, cupom?: string): number {
+  if (cupom === 'FRETEGRATIS' && valorCentavos >= 10000) return 0; // igual à promoção do frete grátis (ADR-009)
   if (valorCentavos >= 20000) return 0;
   return 1990;
 }
