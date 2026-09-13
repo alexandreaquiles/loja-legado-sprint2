@@ -155,29 +155,29 @@ const falhasNucleo = checagens.filter((c) => c.card === null && !c.ok);
 const pendentes = checagens.filter((c) => c.card !== null && !c.ok);
 const exit = falhasNucleo.length || (estrito && pendentes.length) ? 1 : 0;
 
+// process.exitCode (e não process.exit): com stdout num pipe, process.exit corta a saída longa pela metade.
+process.exitCode = exit;
 if (comoJson) {
   console.log(JSON.stringify({ ...resultado, ok: falhasNucleo.length === 0 }, null, 2));
-  process.exit(exit);
+} else {
+  const milhar = (n) => n.toLocaleString('pt-BR');
+  const { inchado: I, enxuto: E } = resultado.inventario;
+  const R = resultado.retornos;
+  console.log('Inventário (tools/list)');
+  console.log(`  inchado: ${I.tools} tools · ~${milhar(I.tokens_estimados)} tokens estimados de definições`);
+  console.log(`  enxuto:  ${E.tools} tools · ~${milhar(E.tokens_estimados)} tokens estimados (${E.nomes.join(', ')})`);
+  console.log('Retornos');
+  console.log(`  getData() do inchado: ~${milhar(R.getData.tokens_estimados)} tokens estimados`);
+  console.log(`  get_team_review_rules(team_id="${TIME}"): ${R.get_team_review_rules_sem_filtro.regras} regras · ~${milhar(R.get_team_review_rules_sem_filtro.tokens_estimados)} tokens estimados`);
+  console.log(`  get_team_review_rules(team_id="${TIME}", severity="error"): ${R.get_team_review_rules_severity_error.regras} regras · ~${milhar(R.get_team_review_rules_severity_error.tokens_estimados)} tokens estimados`);
+  if (R.get_pr_diff) console.log(`  get_pr_diff(${PR}): ${R.get_pr_diff.arquivos.length} arquivos, ${R.get_pr_diff.linhas} linhas de diff · ~${milhar(R.get_pr_diff.tokens_estimados)} tokens estimados`);
+  console.log(`  search_team_adrs("frete"): ${R.search_team_adrs_frete.adrs} ADR · search_team_adrs("ADR-009"): ${R.search_team_adrs_adr_009.adrs} ADR`);
+  console.log('Checagens');
+  for (const c of checagens) {
+    const simbolo = c.ok ? '✔' : c.card === null ? '✘' : '…';
+    console.log(`  ${simbolo} ${c.card ? `[card ${c.card}] ` : ''}${c.texto}`);
+    if (!c.ok && c.dica) console.log(`      → ${c.dica}`);
+  }
+  console.log(`  ${resultado.prompts.length ? '✔' : '…'} [card 04] prompts registrados: ${resultado.prompts.map((p) => p.name).join(', ') || 'nenhum'}`);
+  console.log(`\n${falhasNucleo.length ? `✘ ${falhasNucleo.length} falha(s) no servidor` : '✔ servidor ok'}${pendentes.length ? ` · ${pendentes.length} item(ns) de card pendente(s)` : ''}`);
 }
-
-const milhar = (n) => n.toLocaleString('pt-BR');
-const { inchado: I, enxuto: E } = resultado.inventario;
-const R = resultado.retornos;
-console.log('Inventário (tools/list)');
-console.log(`  inchado: ${I.tools} tools · ~${milhar(I.tokens_estimados)} tokens estimados de definições`);
-console.log(`  enxuto:  ${E.tools} tools · ~${milhar(E.tokens_estimados)} tokens estimados (${E.nomes.join(', ')})`);
-console.log('Retornos');
-console.log(`  getData() do inchado: ~${milhar(R.getData.tokens_estimados)} tokens estimados`);
-console.log(`  get_team_review_rules(team_id="${TIME}"): ${R.get_team_review_rules_sem_filtro.regras} regras · ~${milhar(R.get_team_review_rules_sem_filtro.tokens_estimados)} tokens estimados`);
-console.log(`  get_team_review_rules(team_id="${TIME}", severity="error"): ${R.get_team_review_rules_severity_error.regras} regras · ~${milhar(R.get_team_review_rules_severity_error.tokens_estimados)} tokens estimados`);
-if (R.get_pr_diff) console.log(`  get_pr_diff(${PR}): ${R.get_pr_diff.arquivos.length} arquivos, ${R.get_pr_diff.linhas} linhas de diff · ~${milhar(R.get_pr_diff.tokens_estimados)} tokens estimados`);
-console.log(`  search_team_adrs("frete"): ${R.search_team_adrs_frete.adrs} ADR · search_team_adrs("ADR-009"): ${R.search_team_adrs_adr_009.adrs} ADR`);
-console.log('Checagens');
-for (const c of checagens) {
-  const simbolo = c.ok ? '✔' : c.card === null ? '✘' : '…';
-  console.log(`  ${simbolo} ${c.card ? `[card ${c.card}] ` : ''}${c.texto}`);
-  if (!c.ok && c.dica) console.log(`      → ${c.dica}`);
-}
-console.log(`  ${resultado.prompts.length ? '✔' : '…'} [card 04] prompts registrados: ${resultado.prompts.map((p) => p.name).join(', ') || 'nenhum'}`);
-console.log(`\n${falhasNucleo.length ? `✘ ${falhasNucleo.length} falha(s) no servidor` : '✔ servidor ok'}${pendentes.length ? ` · ${pendentes.length} item(ns) de card pendente(s)` : ''}`);
-process.exit(exit);
