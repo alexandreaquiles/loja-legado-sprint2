@@ -1,0 +1,20 @@
+[
+  { "id": "R-01", "team_id": "loja", "category": "security", "severity": "error", "active": true,
+    "rule": "Desconto percentual tem teto de 30%. Nenhuma action de promoção pode descontar mais que isso, mesmo que o admin configure (incidente do financeiro em 2022)." },
+  { "id": "R-02", "team_id": "loja", "category": "security", "severity": "error", "active": true,
+    "rule": "Nunca ler, logar ou commitar segredos: .env, process.env com chaves de API, URLs de banco com senha. Variáveis de ambiente só em vendure-config.ts." },
+  { "id": "R-03", "team_id": "loja", "category": "architecture", "severity": "error", "active": true,
+    "rule": "Código novo fica em src/plugins/<dominio>/ como VendurePlugin, registrado em vendure-config.ts. Nunca em utils/, misc/, stuff/ nem direto no promotionOptions do config." },
+  { "id": "R-04", "team_id": "loja", "category": "architecture", "severity": "error", "active": true,
+    "rule": "Promoções: nunca reimplementar o que a Promotion nativa do Vendure já faz (código do cupom, startsAt/endsAt, usageLimit, perCustomerUsageLimit). Regra de negócio nova = PromotionCondition ou PromotionAction que SOMA às nativas, nunca substitui." },
+  { "id": "R-05", "team_id": "loja", "category": "style", "severity": "error", "active": true,
+    "rule": "Nenhum console.log em src/. Remover antes de abrir o PR." },
+  { "id": "R-06", "team_id": "loja", "category": "style", "severity": "warning", "active": true,
+    "rule": "Actions e conditions de promoção são puras: sem new Date()/Date.now(), sem I/O, sem process.env. Datas e limites vêm da Promotion." },
+  { "id": "R-07", "team_id": "loja", "category": "style", "severity": "info", "active": true,
+    "rule": "Testes: vitest em test/, um arquivo por feature, ctx e order falsos. Cobrir teto, arredondamento e recusa, não só o caminho feliz." },
+  { "id": "R-08", "team_id": "loja", "category": "architecture", "severity": "warning", "active": true,
+    "rule": "Action de pedido devolve número negativo em centavos e respeita ctx.channel.pricesIncludeTax (subTotalWithTax ou subTotal). code em snake_case; description em pt_BR e en." },
+  { "id": "R-09", "team_id": "loja", "category": "style", "severity": "warning", "active": false,
+    "rule": "Comentários em inglês (regra desativada em 2025)." }
+]

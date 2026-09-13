@@ -1,6 +1,6 @@
 {
   "name": "loja-legado",
-  "version": "2.0.0-legado",
+  "version": "2.1.0-legado",
   "description": "Loja da empresa, migrada para o Vendure em 2024 (legado)",
   "private": true,
   "scripts": {

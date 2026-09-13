@@ -21,4 +21,10 @@ if (!fs.existsSync(path.join(raiz, 'vendure.sqlite'))) {
 } else {
   passo('vendure.sqlite já existe (apague-o e rode de novo para voltar ao seed)');
 }
+// Servidor MCP do time (Sprint 2+): dependências próprias.
+const mcp = path.join(raiz, 'tools', 'revisor-mcp');
+if (fs.existsSync(mcp) && !fs.existsSync(path.join(mcp, 'node_modules'))) {
+  passo('npm install em tools/revisor-mcp (SDK do MCP)');
+  require('child_process').execSync('npm install --no-audit --no-fund --silent', { cwd: mcp, stdio: 'inherit' });
+}
 passo('pronto. npm test | npm run dev (http://localhost:3000/dashboard, superadmin/superadmin) | claude');
