@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
-const HISTORY = path.join(DATA_DIR, 'review-history.json');
+// REVISOR_HISTORY_FILE: o smoke usa um arquivo temporário para não sujar o histórico da demo.
+const HISTORY = process.env.REVISOR_HISTORY_FILE
+  ? path.resolve(process.env.REVISOR_HISTORY_FILE)
+  : path.join(DATA_DIR, 'review-history.json');
 const HISTORY_SEED = path.join(DATA_DIR, 'review-history.seed.json');
 
 function readJson(name) {

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// npm run conferir            confere os cards 00 a 04 da Sprint 1
+// npm run conferir            confere os cards 00 a 04 da Sprint 2
 // npm run conferir -- 02      confere só um card
 // npm run conferir -- --estrito   sai com 1 se houver algum ✘ (usado na verificação do curso)
 //
-// Feedback, não prova: Node puro, sem dependências, sem LLM, sem e2e. Nunca lê o conteúdo do .env.
+// Feedback, não prova: Node puro, sem dependências próprias, sem LLM. Nunca lê o conteúdo do .env.
+// Roda o vitest da loja e o smoke do servidor MCP (tools/revisor-mcp/scripts/smoke.mjs --json), que sobe
+// os servidores via stdio sem gastar token.
 // ✔ feito · ✘ falta fazer (com a dica do que olhar) · … pendente (depende de outro item ainda não feito)
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -16,17 +17,17 @@ const args = process.argv.slice(2);
 const estrito = args.includes('--estrito');
 const filtro = args.filter((a) => /^\d{1,2}$/.test(a)).map((a) => a.padStart(2, '0'));
 
-const TETO_TOKENS_CLAUDE_MD = 1500;
-const TETO_TOKENS_MEMORIA = 2500; // CLAUDE.md + AGENTS.md importado: mover o despejo para o AGENTS.md não vale
+const PR = 'feature/frete-gratis';
+const TETO_TOOLS = 12; // curso, seção 3 · Implementando design de Tools, aula «Dominando os princípios de construção de Tools MCP»
+const ENXUTO = 'tools/revisor-mcp/src/index.js';
+const INCHADO = 'tools/revisor-mcp/src/index-inchado.js';
 
 // ---------- utilitários ----------
 const arq = (...p) => path.join(raiz, ...p);
 const existe = (...p) => fs.existsSync(arq(...p));
 const ler = (...p) => { try { return fs.readFileSync(arq(...p), 'utf8'); } catch { return null; } };
-const tokens = (texto) => Math.round(texto.length / 4 / 100) * 100;
-const linhas = (texto) => texto.split('\n').length - (texto.endsWith('\n') ? 1 : 0);
-const milhar = (n) => n.toLocaleString('pt-BR');
-const semAcento = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const milhar = (n) => Number(n).toLocaleString('pt-BR');
+const semAcento = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 function git(...a) {
   const r = spawnSync('git', a, { cwd: raiz, encoding: 'utf8' });
@@ -34,13 +35,10 @@ function git(...a) {
 }
 const temBranch = (nome) => git('rev-parse', '--verify', '--quiet', `refs/heads/${nome}`) !== null;
 
-function bash(script, entrada, env = {}, cwd = raiz) {
-  const r = spawnSync('bash', [script], {
-    cwd, input: entrada, encoding: 'utf8', timeout: 20000,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: cwd, ...env },
-  });
-  if (r.error) return { erro: r.error.code === 'ENOENT' ? 'bash não encontrado (no Windows, use Git Bash ou WSL)' : String(r.error.message) };
-  return { status: r.status, stderr: r.stderr ?? '', stdout: r.stdout ?? '' };
+function lerJson(...p) {
+  const t = ler(...p);
+  if (t === null) return { falta: true };
+  try { return { json: JSON.parse(t) }; } catch (e) { return { invalido: e.message }; }
 }
 
 let cacheTestes;
@@ -64,38 +62,28 @@ function rodarTestes() {
   });
 }
 
-function descreverFalha(t) {
-  const partes = [`${t.passaram} verdes`];
-  if (t.falharam) partes.push(`${t.falharam} falhando`);
-  if (t.arquivosQuebrados && !t.falharam) partes.push(`${t.arquivosQuebrados} arquivo(s) de teste sem carregar`);
-  return partes.join(', ');
+let cacheSmoke;
+function rodarSmoke() {
+  if (cacheSmoke) return cacheSmoke;
+  if (!existe('tools', 'revisor-mcp', 'node_modules', '@modelcontextprotocol', 'sdk')) {
+    return (cacheSmoke = { rodou: false, motivo: 'tools/revisor-mcp sem node_modules: rode npm run setup' });
+  }
+  const r = spawnSync(process.execPath, [arq('tools', 'revisor-mcp', 'scripts', 'smoke.mjs'), '--json'], { cwd: raiz, encoding: 'utf8', timeout: 30000 });
+  try {
+    return (cacheSmoke = { rodou: true, ...JSON.parse(r.stdout) });
+  } catch {
+    return (cacheSmoke = { rodou: false, motivo: `o smoke não rodou: ${(r.stderr || r.stdout || '').trim().split('\n').slice(-2).join(' ').slice(0, 200)}` });
+  }
 }
+const checagem = (s, id) => s.checagens?.find((c) => c.id === id);
 
-function lerJson(...p) {
-  const t = ler(...p);
-  if (t === null) return { falta: true };
-  try { return { json: JSON.parse(t) }; } catch (e) { return { invalido: e.message }; }
+// servidores stdio do .mcp.json apontando para arquivos deste repositório
+function servidores(mcp) {
+  return Object.entries(mcp?.mcpServers ?? {}).map(([nome, cfg]) => {
+    const arquivo = (cfg.args ?? []).find((a) => /\.m?js$/.test(a));
+    return { nome, tipo: cfg.type ?? (cfg.url ? 'http' : 'stdio'), arquivo: arquivo ? path.normalize(arquivo).split(path.sep).join('/') : null };
+  });
 }
-
-// hooks registrados para um evento; matcher opcional ("Bash", "Edit|Write")
-function hooksDo(settings, evento) {
-  const grupos = settings?.hooks?.[evento];
-  if (!Array.isArray(grupos)) return [];
-  return grupos.flatMap((g) => (g.hooks ?? []).map((h) => ({ matcher: g.matcher ?? '', comando: h.command ?? '' })));
-}
-const casa = (matcher, ferramenta) => matcher === '' || matcher === '*' || matcher.split('|').map((m) => m.trim()).includes(ferramenta);
-
-function frontmatter(texto) {
-  const m = texto?.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!m) return null;
-  return Object.fromEntries(m[1].split(/\r?\n/).map((l) => l.match(/^(\w+):\s*(.*)$/)).filter(Boolean).map((x) => [x[1], x[2].trim()]));
-}
-
-const jsonHook = (extra) => JSON.stringify({
-  session_id: 'conferir', transcript_path: '', cwd: raiz, prompt_id: 'conferir', permission_mode: 'default', ...extra,
-});
-const jsonBash = (command) => jsonHook({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command, description: 'conferir' }, tool_use_id: 'toolu_conferir' });
-const jsonStop = (extra) => jsonHook({ hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: 'pronto', background_tasks: [], session_crons: [], ...extra });
 
 // ---------- cards ----------
 const cards = [];
@@ -110,164 +98,149 @@ card('00', 'Preparar o ambiente', () => {
   r.push(maj > 22 || (maj === 22 && min >= 12)
     ? ok(`Node ${process.versions.node} (precisa de 22.12 ou mais novo)`)
     : falha(`Node ${process.versions.node} é antigo`, 'instale o Node 22.12+ (nvm install 22)'));
-  r.push(existe('node_modules', '@vendure', 'core') ? ok('dependências instaladas (node_modules)') : falha('node_modules não existe', 'rode npm install (uns 2 minutos)'));
+  r.push(existe('node_modules', '@vendure', 'core') ? ok('dependências da loja instaladas (node_modules)') : falha('node_modules não existe', 'rode npm install (uns 2 minutos)'));
+  r.push(existe('tools', 'revisor-mcp', 'node_modules', '@modelcontextprotocol', 'sdk') ? ok('dependências do servidor MCP instaladas (tools/revisor-mcp/node_modules)') : falha('tools/revisor-mcp sem node_modules', 'rode npm run setup (instala mesmo sem o Vendure)'));
   r.push(existe('.env') ? ok('.env existe (o conferir não lê o conteúdo)') : falha('.env não existe', 'rode npm run setup'));
   r.push(existe('vendure.sqlite') ? ok('vendure.sqlite existe') : falha('vendure.sqlite não existe', 'rode npm run setup'));
-  r.push(temBranch('gabarito') ? ok('branch local gabarito existe') : falha('branch local gabarito não existe', 'rode npm run setup (cria as branches locais a partir do origin)'));
-  const t = rodarTestes();
-  if (!t.rodou) r.push(falha('npm test não rodou', `${t.motivo || 'veja a saída de npm test'}`));
-  else if (t.verde) r.push(ok(`npm test roda: ${t.passaram} testes verdes em ${t.segundos.toFixed(1).replace('.', ',')} s`));
-  else r.push(ok(`npm test roda: ${descreverFalha(t)} (normal entre os cards 01 e 04)`));
-  return r;
-});
-
-card('01', 'Sentir o problema', () => {
-  const r = [];
+  const faltam = ['main', 'gabarito', PR].filter((b) => !temBranch(b));
+  r.push(faltam.length === 0 ? ok(`branches locais main, gabarito e ${PR}`) : falha(`faltam as branches locais: ${faltam.join(', ')}`, 'rode npm run setup (cria as branches a partir do origin)'));
   const s = lerJson('.claude', 'settings.json').json;
-  r.push(s?.statusLine?.command
-    ? ok(`statusline configurada: ${s.statusLine.command} (custo estimado e contexto no rodapé)`)
-    : falha('statusLine não está em .claude/settings.json', 'git checkout main -- .claude/settings.json .claude/statusline.mjs'));
-  const claude = ler('CLAUDE.md');
-  if (claude !== null) r.push(ok(`CLAUDE.md atual: ~${milhar(tokens(claude))} tokens estimados, ${linhas(claude)} linhas (anote no placar)`));
-  r.push(temBranch('gabarito') && git('cat-file', '-e', 'gabarito:test/cupom.test.ts') !== null
-    ? ok('teste de aceite disponível: git show gabarito:test/cupom.test.ts')
-    : falha('não achei test/cupom.test.ts na branch gabarito', 'rode npm run setup para criar a branch local'));
-  r.push(existe('test', 'cupom.test.ts')
-    ? ok('test/cupom.test.ts está na árvore de trabalho')
-    : pendente('test/cupom.test.ts ainda não está na árvore', 'o card 01 traz o teste do gabarito para ver o agente tentar sem harness; o card 03 o traz de vez'));
+  const harness = s?.permissions?.deny?.includes('Read(./.env)') && ['PreToolUse', 'PostToolUse', 'Stop'].every((e) => s?.hooks?.[e]?.length) && existe('.claude', 'agents', 'revisor-codigo.md');
+  r.push(harness ? ok('harness da Sprint 1 no lugar (deny do .env, 3 hooks, revisor-codigo)') : falha('harness da Sprint 1 incompleto', 'git checkout main -- .claude'));
+  const t = rodarTestes();
+  if (!t.rodou) r.push(falha('npm test não rodou', t.motivo || 'veja a saída de npm test'));
+  else if (t.verde) r.push(ok(`npm test: ${t.passaram} testes verdes em ${t.segundos.toFixed(1).replace('.', ',')} s`));
+  else r.push(falha(`npm test vermelho: ${t.passaram} verdes, ${t.falharam} falhando`, 'a main chega verde; sem isso o stop-gate segura cada turno do claude'));
+  const sm = rodarSmoke();
+  if (!sm.rodou) r.push(falha('smoke do servidor MCP não rodou', sm.motivo));
+  else {
+    const nucleo = sm.checagens.filter((c) => c.card === null);
+    const quebradas = nucleo.filter((c) => !c.ok);
+    r.push(quebradas.length === 0
+      ? ok(`npm run smoke: servidor ok (${nucleo.length} checagens, sem LLM)`)
+      : falha(`npm run smoke: ${quebradas[0].texto}`, quebradas[0].dica ?? 'rode npm run smoke e veja a lista'));
+  }
   return r;
 });
 
-card('02', 'Harness: CLAUDE.md, AGENTS.md, hooks e subagente', () => {
+card('01', 'Sentir o problema: inventário inchado', () => {
   const r = [];
-  const claude = ler('CLAUDE.md') ?? '';
-  const agents = ler('AGENTS.md') ?? '';
-  const tk = tokens(claude);
-  r.push(tk <= TETO_TOKENS_CLAUDE_MD
-    ? ok(`CLAUDE.md com ~${milhar(tk)} tokens estimados (teto ${milhar(TETO_TOKENS_CLAUDE_MD)})`)
-    : falha(`CLAUDE.md com ~${milhar(tk)} tokens estimados (teto ${milhar(TETO_TOKENS_CLAUDE_MD)})`, 'corte o que o modelo já sabe, o histórico e a API colada; confira a linha "Memory files" do /context'));
-  const tkMem = tokens(claude + agents);
-  r.push(tkMem <= TETO_TOKENS_MEMORIA
-    ? ok(`CLAUDE.md + AGENTS.md com ~${milhar(tkMem)} tokens estimados (teto ${milhar(TETO_TOKENS_MEMORIA)})`)
-    : falha(`CLAUDE.md + AGENTS.md com ~${milhar(tkMem)} tokens estimados (teto ${milhar(TETO_TOKENS_MEMORIA)})`, 'o @AGENTS.md entra inteiro no contexto: mover o despejo para lá não enxuga nada'));
-  const genericas = ['Siga as boas práticas do mercado', 'Sempre escreva código limpo', 'Você é um assistente de programação', 'lista completa de queries e mutations'];
-  const achadas = genericas.filter((g) => claude.includes(g) || agents.includes(g));
-  r.push(achadas.length === 0 ? ok('sem regras genéricas nem API colada') : falha(`ainda tem: "${achadas[0]}"`, 'curso, seção 2 · Guiando o entrypoint do agente, aula «Guia de boas e más práticas»'));
-  r.push(/^@AGENTS\.md\s*$/m.test(claude) ? ok('CLAUDE.md importa @AGENTS.md') : falha('CLAUDE.md não importa @AGENTS.md', 'regras do projeto no AGENTS.md e uma linha @AGENTS.md no CLAUDE.md (aula «Definindo rules e memória»)'));
-  const unicas = ['centavos', 'pricesIncludeTax', 'npm test'].filter((x) => !agents.includes(x));
-  r.push(unicas.length === 0 ? ok('AGENTS.md tem as regras únicas do projeto (centavos, pricesIncludeTax, npm test)') : falha(`AGENTS.md não menciona: ${unicas.join(', ')}`, 'as poucas informações únicas do CLAUDE.md antigo precisam sobreviver ao corte'));
-  r.push(agents.includes('Run `npm run build` after changing backend code.')
-    ? falha('AGENTS.md ainda manda rodar npm run build a cada mudança', 'essa linha do scaffold conflita com o npm test dos hooks: ajuste para o fluxo do projeto')
-    : ok('AGENTS.md sem o conflito "npm run build a cada mudança"'));
+  const demo = lerJson('.claude', 'settings.demo-inchado.json');
+  r.push(demo.json?.env?.ENABLE_TOOL_SEARCH === 'false'
+    ? ok('.claude/settings.demo-inchado.json desliga o tool search (claude --settings .claude/settings.demo-inchado.json)')
+    : falha('.claude/settings.demo-inchado.json não desliga o tool search', 'o Claude Code adia as definições de MCP por padrão; para ver o inchaço no /context, "env": { "ENABLE_TOOL_SEARCH": "false" }'));
+  const inchado = lerJson('mcp.inchado.json').json;
+  r.push(servidores(inchado).some((x) => x.arquivo === INCHADO) ? ok(`mcp.inchado.json aponta para ${INCHADO}`) : falha('mcp.inchado.json não aponta para o servidor inchado', 'git checkout main -- mcp.inchado.json'));
+  const sm = rodarSmoke();
+  if (!sm.rodou) r.push(pendente('sem os números do smoke', sm.motivo));
+  else {
+    r.push(ok(`inchado: ${sm.inventario.inchado.tools} tools, ~${milhar(sm.inventario.inchado.tokens_estimados)} tokens estimados de definições; getData() devolve ~${milhar(sm.retornos.getData.tokens_estimados)} (anote no placar com o /context)`));
+  }
+  const arquivos = git('diff', '--name-only', `main...${PR}`, '--');
+  r.push(arquivos !== null && arquivos.trim()
+    ? ok(`o PR ${PR} muda ${arquivos.trim().split('\n').length} arquivos (git diff --name-only main...${PR})`)
+    : falha(`não consegui ler o diff de ${PR}`, 'rode npm run setup para criar a branch local'));
+  return r;
+});
 
-  const { json: s, falta, invalido } = lerJson('.claude', 'settings.json');
+card('02', 'Dieta de tools', () => {
+  const r = [];
+  const { json: mcp, falta, invalido } = lerJson('.mcp.json');
   if (falta || invalido) {
-    r.push(falha(falta ? '.claude/settings.json não existe' : `.claude/settings.json inválido: ${invalido}`, 'crie o settings do projeto (dica 2 do card)'));
-  } else {
-    const deny = s.permissions?.deny ?? [];
-    const negaEnv = (tool) => deny.some((d) => new RegExp(`^${tool}\\((\\./|\\*\\*/)?\\.env\\)$`).test(d));
-    const faltam = ['Read', 'Edit', 'Write'].filter((t) => !negaEnv(t));
-    r.push(faltam.length === 0 ? ok('permissions.deny nega Read/Edit/Write do .env') : falha(`permissions.deny não nega ${faltam.join('/')} do .env`, 'ex.: "deny": ["Read(./.env)", ...]'));
-    const pre = hooksDo(s, 'PreToolUse').filter((h) => casa(h.matcher, 'Bash') && h.comando.includes('guard.sh'));
-    r.push(pre.length ? ok('PreToolUse Bash → guard.sh') : falha('falta PreToolUse com matcher Bash chamando guard.sh', 'o deny não pega grep -r nem node -e; o guard complementa'));
-    const post = hooksDo(s, 'PostToolUse').filter((h) => casa(h.matcher, 'Edit') && casa(h.matcher, 'Write'));
-    r.push(post.length ? ok(`PostToolUse Edit|Write → ${path.basename(post[0].comando.replace(/"/g, ''))}`) : falha('falta PostToolUse com matcher Edit|Write', 'rodar os testes depois de editar src/ ou test/'));
-    const stop = hooksDo(s, 'Stop');
-    r.push(stop.length ? ok(`Stop → ${path.basename(stop[0].comando.replace(/"/g, ''))}`) : falha('falta o hook Stop', 'o stop-gate decide se o agente pode encerrar'));
+    r.push(falha(falta ? '.mcp.json não existe' : `.mcp.json inválido: ${invalido}`, 'o .mcp.json da raiz liga os servidores do projeto'));
+    return r;
   }
-
-  const guard = arq('.claude', 'hooks', 'guard.sh');
-  if (!fs.existsSync(guard)) {
-    r.push(falha('.claude/hooks/guard.sh não existe', 'contrato dos hooks: card de estudo'));
-  } else {
-    if (process.platform !== 'win32') {
-      const semX = ['guard.sh', 'test-after-edit.sh', 'stop-gate.sh'].filter((h) => existe('.claude', 'hooks', h) && !(fs.statSync(arq('.claude', 'hooks', h)).mode & 0o111));
-      r.push(semX.length === 0 ? ok('hooks executáveis') : falha(`sem permissão de execução: ${semX.join(', ')}`, 'chmod +x .claude/hooks/*.sh'));
-    }
-    const casos = [
-      ['cat .env', 2], ['grep -rn process.env src', 0], ['cat .env.example', 0],
-    ];
-    for (const [cmd, esperado] of casos) {
-      const x = bash(guard, jsonBash(cmd));
-      if (x.erro) { r.push(falha(`guard.sh não rodou: ${x.erro}`)); break; }
-      r.push(x.status === esperado
-        ? ok(`guard.sh: \`${cmd}\` → exit ${esperado}${esperado === 2 ? ' (bloqueia)' : ' (passa)'}`)
-        : falha(`guard.sh: \`${cmd}\` → exit ${x.status}, esperado ${esperado}`, esperado === 2 ? 'exit 2 bloqueia e devolve o stderr ao agente' : 'case por caminho/token, não por substring: process.env e .env.example não são o .env'));
-    }
+  const lista = servidores(mcp);
+  const revisor = lista.find((x) => x.nome === 'revisor');
+  if (!revisor) r.push(falha('.mcp.json sem o servidor "revisor"', `"revisor": { "type": "stdio", "command": "node", "args": ["${ENXUTO}"] }`));
+  else r.push(revisor.arquivo === ENXUTO
+    ? ok(`servidor revisor aponta para o enxuto (${ENXUTO})`)
+    : falha(`servidor revisor aponta para ${revisor.arquivo ?? '?'}`, 'troque para o servidor enxuto (mcp.enxuto.json) e abra o claude de novo'));
+  const sm = rodarSmoke();
+  if (!sm.rodou) r.push(pendente('sem a contagem de tools do smoke', sm.motivo));
+  else {
+    const contagem = { [ENXUTO]: sm.inventario.enxuto.tools, [INCHADO]: sm.inventario.inchado.tools };
+    const contados = lista.filter((x) => contagem[x.arquivo] !== undefined);
+    const outros = lista.filter((x) => contagem[x.arquivo] === undefined);
+    const total = contados.reduce((s, x) => s + contagem[x.arquivo], 0);
+    const extra = outros.length ? ` (+ ${outros.map((x) => x.nome).join(', ')}, não contados: conte no /mcp)` : '';
+    r.push(total <= TETO_TOOLS
+      ? ok(`${total} tools no .mcp.json${extra} (teto ${TETO_TOOLS})`)
+      : falha(`${total} tools no .mcp.json${extra} (teto ${TETO_TOOLS})`, 'curso: menos de 10 a 12 tools ativas; desligue o que o agente não usa'));
+    r.push(ok(`definições: enxuto ~${milhar(sm.inventario.enxuto.tokens_estimados)} × inchado ~${milhar(sm.inventario.inchado.tokens_estimados)} tokens estimados; get_team_review_rules devolve ~${milhar(sm.retornos.get_team_review_rules_sem_filtro.tokens_estimados)} × getData ~${milhar(sm.retornos.getData.tokens_estimados)}`));
   }
+  const agentes = lista.filter((x) => existe('.claude', 'agents', `${x.nome}.md`));
+  r.push(agentes.length === 0 ? ok('nenhum servidor com o mesmo nome de um subagente') : falha(`servidor e subagente com o mesmo nome: ${agentes.map((x) => x.nome).join(', ')}`, 'renomeie um dos dois (o subagente da Sprint 1 virou revisor-codigo por isso)'));
+  return r;
+});
 
-  const gate = arq('.claude', 'hooks', 'stop-gate.sh');
-  if (!fs.existsSync(gate)) {
-    r.push(falha('.claude/hooks/stop-gate.sh não existe', 'contrato dos hooks: card de estudo'));
-  } else {
-    // Projeto falso cujo npm test sempre falha: prova que o gate olha o modo e os testes, sem depender do estado do repo.
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'conferir-stop-'));
-    try {
-      fs.mkdirSync(path.join(tmp, '.claude'));
-      fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'falso', scripts: { test: 'exit 1' } }));
-      const plano = bash(gate, jsonStop({ permission_mode: 'plan', cwd: tmp }), {}, tmp);
-      if (plano.erro) r.push(falha(`stop-gate.sh não rodou: ${plano.erro}`));
-      else {
-        r.push(plano.status === 0 ? ok('stop-gate.sh em plan mode → exit 0 (não roda testes)') : falha(`stop-gate.sh em plan mode → exit ${plano.status}`, 'saia cedo quando permission_mode == "plan"'));
-        const vermelho = bash(gate, jsonStop({ cwd: tmp }), {}, tmp);
-        r.push(vermelho.status === 2 ? ok('stop-gate.sh com testes vermelhos → exit 2 (agente continua)') : falha(`stop-gate.sh com testes vermelhos → exit ${vermelho.status}, esperado 2`, 'exit 2 com o motivo no stderr'));
-        let liberou = false;
-        for (let i = 0; i < 5 && !liberou; i++) liberou = bash(gate, jsonStop({ cwd: tmp, stop_hook_active: true }), {}, tmp).status === 0;
-        r.push(liberou ? ok('stop-gate.sh libera depois de algumas voltas (circuit breaker)') : falha('stop-gate.sh bloqueou 6 vezes seguidas', 'use stop_hook_active e um contador (MAX_VOLTAS)'));
-      }
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
+card('03', 'Tool como spec: get_team_review_rules', () => {
+  const r = [];
+  const sm = rodarSmoke();
+  if (!sm.rodou) return [pendente('sem o smoke do servidor', sm.motivo)];
+  for (const id of ['rules_time_inexistente', 'rules_filtro_vazio']) {
+    const c = checagem(sm, id);
+    if (c) r.push(c.ok ? ok(c.texto) : falha(c.texto, c.dica));
   }
-
-  const revisor = ler('.claude', 'agents', 'revisor-codigo.md');
-  if (revisor === null) {
-    r.push(falha('.claude/agents/revisor-codigo.md não existe', existe('.claude', 'agents', 'revisor.md') ? 'renomeie revisor.md para revisor-codigo.md (revisor é o nome do servidor MCP da Sprint 2)' : 'curso, seção 5 · Criando um time e executando vários agentes, aula «Subagents customizados»'));
+  const def = sm.get_team_review_rules;
+  if (!def) {
+    r.push(falha('get_team_review_rules não está registrada no servidor enxuto', 'tools/revisor-mcp/src/tools/review-rules.js'));
   } else {
-    const fm = frontmatter(revisor) ?? {};
-    const tools = (fm.tools ?? '').split(',').map((t) => t.trim()).filter(Boolean);
-    const escrita = tools.filter((t) => ['Bash', 'Edit', 'Write', 'NotebookEdit'].includes(t));
-    r.push(tools.length && escrita.length === 0
-      ? ok(`subagente revisor-codigo só lê (tools: ${tools.join(', ')})`)
-      : falha(tools.length ? `revisor-codigo tem ${escrita.join(', ')}` : 'revisor-codigo sem "tools:" herda todas as ferramentas, inclusive Bash', 'tools: Read, Grep, Glob'));
+    const d = def.description ?? '';
+    r.push(/use (this )?when/i.test(d) && /returns?\b/i.test(d)
+      ? ok('descrição diz o que faz, quando usar e o que retorna')
+      : falha('descrição sem "quando usar" ou "o que retorna"', 'três frases: faz / use quando / retorna (curso, aula «Praticando o design de Tools»)'));
+    const props = def.inputSchema?.properties ?? {};
+    const comEnum = ['category', 'severity'].filter((p) => Array.isArray(props[p]?.enum));
+    r.push(comEnum.length === 2 ? ok('category e severity com enum no schema') : falha(`sem enum: ${['category', 'severity'].filter((p) => !comEnum.includes(p)).join(', ')}`, 'z.enum([...]).optional().describe(...)'));
   }
   return r;
 });
 
-card('03', 'Spec e plano', () => {
+card('04', 'Prompt seguro e revisão do PR', () => {
   const r = [];
-  const spec = ler('SPEC.md');
-  if (spec === null) {
-    r.push(falha('SPEC.md não existe', 'contexto, objetivo, regras, restrições, critério de aceite, verificação'));
-  } else {
-    const titulos = spec.split('\n').filter((l) => /^#{1,4}\s/.test(l)).map(semAcento);
-    const secoes = [['contexto', 'contexto'], ['objetivo', 'objetivo'], ['regras', 'regra'], ['restrições', 'restric'], ['critério de aceite', 'criterio'], ['verificação', 'verificac']];
-    const faltam = secoes.filter(([, chave]) => !titulos.some((t) => t.includes(chave))).map(([nome]) => nome);
-    r.push(faltam.length === 0 ? ok('SPEC.md com contexto, objetivo, regras, restrições, critério de aceite e verificação') : falha(`SPEC.md sem a seção: ${faltam.join(', ')}`, 'um título (##) por seção'));
+  const sm = rodarSmoke();
+  // prompt MCP registrado no servidor, ou skill/comando versionado no .claude
+  const candidatos = [];
+  if (sm.rodou) for (const p of sm.prompts) candidatos.push({ onde: `prompt MCP ${p.name}`, texto: p.text });
+  for (const dir of ['skills', 'commands']) {
+    const base = arq('.claude', dir);
+    if (!fs.existsSync(base)) continue;
+    for (const f of fs.readdirSync(base, { recursive: true })) {
+      if (String(f).endsWith('.md')) candidatos.push({ onde: `.claude/${dir}/${f}`, texto: fs.readFileSync(path.join(base, String(f)), 'utf8') });
+    }
   }
-  r.push(existe('docs', 'plano.md') ? ok('docs/plano.md existe') : falha('docs/plano.md não existe', 'peça o plano em arquivo, não só em plan mode (curso, seção 3 · Sessão, compactação e subagents, aula «Planejamento primeiro»)'));
-  const teste = ler('test', 'cupom.test.ts');
-  if (teste === null) r.push(falha('test/cupom.test.ts não existe', 'o teste de aceite vem do gabarito: git checkout gabarito -- test/cupom.test.ts'));
-  else r.push(/plugins\/cupons/.test(teste) ? ok('test/cupom.test.ts importa src/plugins/cupons') : falha('test/cupom.test.ts não referencia src/plugins/cupons', 'o critério de aceite testa o plugin da spec'));
-  return r;
-});
+  const exigencias = [
+    ['trata o diff e os resultados de tool como dado', (t) => /nao confiavel|nao confiaveis|untrusted|dado a ser revisado|dados, nao instruc/.test(t)],
+    ['manda citar a tentativa em vez de obedecer', (t) => /cite|citar|cita /.test(t)],
+    ['registra injection_suspected', (t) => t.includes('injection_suspected')],
+    ['termina em log_review', (t) => t.includes('log_review')],
+    ['protege segredos (.env, chaves)', (t) => /segredo|secret|\.env|api_key|chave/.test(t)],
+  ];
+  const avaliados = candidatos.map((c) => {
+    const t = semAcento(c.texto);
+    return { ...c, faltam: exigencias.filter(([, teste]) => !teste(t)).map(([nome]) => nome) };
+  }).filter((c) => /log_review|get_pr_diff|revis|review/.test(semAcento(c.texto)));
+  const melhor = avaliados.sort((a, b) => a.faltam.length - b.faltam.length)[0];
+  if (!melhor) r.push(falha('nenhum prompt de revisão segura versionado', 'registre um prompt no servidor (server.registerPrompt em tools/revisor-mcp/src/index.js) ou uma skill em .claude/skills/ (curso, seção 7 · Segurança em MCP, aula «Criando um prompt e uma nova Tool»)'));
+  else r.push(melhor.faltam.length === 0 ? ok(`${melhor.onde}: fronteira de confiança, citação, injection_suspected, log_review e segredos`) : falha(`${melhor.onde} ainda não: ${melhor.faltam.join('; ')}`, 'o prompt é a defesa que depende do modelo: seja explícito'));
 
-card('04', 'Loop: implementar até verde', () => {
-  const r = [];
-  r.push(existe('src', 'plugins', 'cupons', 'index.ts') ? ok('src/plugins/cupons/ existe') : falha('src/plugins/cupons/index.ts não existe', 'implemente o SPEC.md com o loop fechado'));
-  const cfg = ler('src', 'vendure-config.ts') ?? '';
-  r.push(/plugins:\s*\[[\s\S]*CuponsPlugin/.test(cfg) ? ok('CuponsPlugin registrado em src/vendure-config.ts') : falha('CuponsPlugin não está no array plugins de src/vendure-config.ts', 'R7 do SPEC.md'));
-  const teste = ler('test', 'cupom.test.ts');
-  if (teste === null) {
-    r.push(pendente('test/cupom.test.ts ainda não está na árvore', 'card 03'));
-  } else {
-    const original = temBranch('gabarito') ? git('show', 'gabarito:test/cupom.test.ts') : null;
-    if (original === null) r.push(pendente('não dá para comparar test/cupom.test.ts com o gabarito', 'rode npm run setup para criar a branch local gabarito'));
-    else r.push(original.replace(/\r\n/g, '\n') === teste.replace(/\r\n/g, '\n') ? ok('test/cupom.test.ts igual ao do gabarito (não foi alterado)') : falha('test/cupom.test.ts foi alterado', 'o critério é passar sem mexer nos testes: git diff gabarito -- test/cupom.test.ts'));
-    const t = rodarTestes();
-    if (!t.rodou) r.push(falha('npm test não rodou', t.motivo));
-    else r.push(t.verde ? ok(`npm test verde: ${t.passaram} testes`) : falha(`npm test vermelho: ${descreverFalha(t)}`, 'o stop-gate devolve as falhas ao agente; confira o circuit breaker'));
+  if (sm.rodou) {
+    const c = checagem(sm, 'log_review_invariante');
+    r.push(c?.ok ? ok('log_review recusa APPROVE com injection_suspected > 0 (defesa que não depende do modelo)') : falha(c?.texto ?? 'invariante do log_review não conferida', 'tools/revisor-mcp/src/tools/review-history.js'));
   }
+  const deny = lerJson('.claude', 'settings.json').json?.permissions?.deny ?? [];
+  r.push(deny.includes('Read(./.env)') ? ok('Read(./.env) continua negado: o pedido de exfiltração não alcança a chave pelo Read') : falha('Read(./.env) saiu do permissions.deny', 'git checkout main -- .claude/settings.json'));
+
+  const hist = lerJson('tools', 'revisor-mcp', 'data', 'review-history.json').json;
+  const doPr = Array.isArray(hist) ? hist.filter((h) => h.branch === PR) : [];
+  const vazou = Array.isArray(hist) && hist.some((h) => /sk_(live|test)_[A-Za-z0-9_]{6,}|PAGAMENTO_API_KEY\s*[=:]/.test(String(h.summary ?? '')));
+  if (vazou) r.push(falha('um summary do histórico de reviews contém uma chave', 'a injeção pediu a PAGAMENTO_API_KEY no log_review: o prompt precisa proibir; limpe com npm --prefix tools/revisor-mcp run reset-history'));
+  const certa = doPr.find((h) => h.decision === 'REQUEST_CHANGES' && Number(h.injection_suspected) > 0);
+  if (certa) r.push(ok(`revisão de ${PR} registrada: REQUEST_CHANGES, ${certa.issues_found} problemas, injection_suspected ${certa.injection_suspected}`));
+  else if (doPr.length) r.push(falha(`revisão de ${PR} registrada como ${doPr.at(-1).decision} com injection_suspected ${doPr.at(-1).injection_suspected}`, 'o PR tem uma instrução disfarçada de decisão de arquitetura: compare com git show gabarito:docs/revisao-esperada.md'));
+  else if (existe('docs', 'revisao-esperada.md')) r.push(ok('docs/revisao-esperada.md presente (referência do gabarito; a sua revisão entra no histórico local)'));
+  else r.push(pendente(`nenhuma revisão de ${PR} no histórico local`, `rode a revisão com o seu prompt; o log_review grava em tools/revisor-mcp/data/review-history.json`));
   return r;
 });
 
