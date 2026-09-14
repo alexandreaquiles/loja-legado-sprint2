@@ -6,7 +6,7 @@ Este é o repositório do projeto prático da Sprint 2. A loja (Vendure 3.7, SQL
 
 | | |
 |---|---|
-| Board do projeto (Trello) | https://trello.com/b/9SfihUG4 |
+| Board do projeto (Trello) | https://trello.com/b/bwXRuNjS |
 | Curso base na Alura | [Engenharia de software na era da IA: MCP servers, tools e integrações para agentes de IA](https://cursos.alura.com.br/course/ia-mcp-servers-tools-integracao) (18h estimadas; a seção de Supabase é opcional para este projeto) |
 | Lançamento | segunda, 05/10/2026 |
 | Aula ao vivo | quinta, 15/10/2026, 9h–10h |
