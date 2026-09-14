@@ -58,7 +58,7 @@ Copie o board do Trello para a sua conta e mova os cards. Resumo:
 | 05 | Intermediária: uma tool em três frases (feito na aula ao vivo) | Intermediária |
 | 06 | Desafio em 3 níveis, no seu repositório ou no `loja-legado` | Desafio |
 
-Cada card termina com `npm run conferir -- NN` (por exemplo `npm run conferir -- 03`): ✔ feito, ✘ falta, … depende de outro card. É feedback, não nota: nada ali usa LLM nem lê o seu `.env`.
+Cada card termina com `npm run conferir -- NN` (por exemplo `npm run conferir -- 03`): ✔ feito, ✘ falta, … depende de outro card. É feedback, não nota: nada ali usa LLM, e do seu `.env` ele só lê a `PAGAMENTO_API_KEY`, sem imprimir, para procurar vazamento no registro das revisões.
 
 As tarefas essenciais são as que o professor resolve ao vivo na quinta. Tente antes: a aula rende muito mais quando você já esbarrou no problema.
 
@@ -66,7 +66,7 @@ As tarefas essenciais são as que o professor resolve ao vivo na quinta. Tente a
 
 - `main`: o estado inicial, com o servidor inchado configurado em `.mcp.json`.
 - `feature/frete-gratis`: o PR em revisão. Os testes passam; não faça merge sem revisar.
-- `gabarito`: uma solução de referência para os cards 02 a 04 (`.mcp.json` enxuto, erro informativo, prompt `secure_code_review`, `CLAUDE.md` da sprint), a revisão esperada do PR em `docs/revisao-esperada.md` e a referência da Intermediária em `docs/intermediaria/`. Vale mais espiar depois de tentar: `git show gabarito:<arquivo>`.
+- `gabarito`: uma solução de referência para os cards 02 a 04 (`.mcp.json` enxuto, erro informativo, prompt `secure_code_review`, `CLAUDE.md` da sprint), e a referência da Intermediária em `docs/intermediaria/`. Vale mais espiar depois de tentar: `git show gabarito:<arquivo>`. A revisão esperada do PR fica fora do repositório, no Gabarito da tarefa 04 no Trello: aqui, o agente que revisa o PR a leria com um `git show`.
 
 ## Como entregar o Desafio
 
