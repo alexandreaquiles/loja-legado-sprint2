@@ -98,9 +98,7 @@ try {
     'dado vazio é resposta válida: count 0 (o erro é só para time inexistente)');
 
   const adrFrete = await chamar(enxuto, 'search_team_adrs', { team_id: TIME, keyword: 'frete' });
-  const adrFalsa = await chamar(enxuto, 'search_team_adrs', { team_id: TIME, keyword: 'ADR-009' });
   resultado.retornos.search_team_adrs_frete = { adrs: contagem(adrFrete), caracteres: adrFrete.text.length };
-  resultado.retornos.search_team_adrs_adr_009 = { adrs: contagem(adrFalsa) };
 
   // get_pr_diff
   const diff = await chamar(enxuto, 'get_pr_diff', { branch: PR });
@@ -111,9 +109,10 @@ try {
   checar('pr_diff', null, !diff.isError, `get_pr_diff(${PR}) → ${resultado.retornos.get_pr_diff?.arquivos.length} arquivos`,
     `get_pr_diff(${PR}) falhou: ${diff.text.slice(0, 160)}`, 'num clone novo, rode npm run setup (cria as branches locais)');
   const alvo = path.join(tmp, 'pwned.txt');
-  const opcao = await chamar(enxuto, 'get_pr_diff', { branch: 'main', base: `--output=${alvo}` });
-  checar('pr_diff_opcao', null, opcao.isError && !existsSync(alvo), 'get_pr_diff recusa base "--output=..." e não escreve arquivo',
-    `get_pr_diff com base "--output=..." ${existsSync(alvo) ? 'ESCREVEU o arquivo' : 'não foi recusado'}`, 'regex de ref no Zod, rev-parse --verify e "--"');
+  const opcao = await chamar(enxuto, 'get_pr_diff', { branch: PR, base: `--output=${alvo}` });
+  const foraDePr = await chamar(enxuto, 'get_pr_diff', { branch: 'main' }); // só feature/*: a solução da sprint não passa pela tool
+  checar('pr_diff_opcao', null, opcao.isError && !existsSync(alvo) && foraDePr.isError, 'get_pr_diff recusa base "--output=..." (sem escrever arquivo) e branch fora de feature/',
+    `get_pr_diff ${existsSync(alvo) ? 'ESCREVEU o arquivo com base "--output=..."' : !opcao.isError ? 'aceitou base "--output=..."' : 'aceitou uma branch fora de feature/'}`, 'regex de ref no Zod, rev-parse --verify, "--" e só branch feature/ no handler');
   const naoExiste = await chamar(enxuto, 'get_pr_diff', { branch: 'feature/nao-existe' });
   checar('pr_diff_inexistente', null, naoExiste.isError && naoExiste.text.includes('main'), 'get_pr_diff com branch inexistente → erro que lista as branches locais',
     `get_pr_diff com branch inexistente → ${naoExiste.text.slice(0, 120)}`);
@@ -171,7 +170,7 @@ if (comoJson) {
   console.log(`  get_team_review_rules(team_id="${TIME}"): ${R.get_team_review_rules_sem_filtro.regras} regras · ~${milhar(R.get_team_review_rules_sem_filtro.tokens_estimados)} tokens estimados`);
   console.log(`  get_team_review_rules(team_id="${TIME}", severity="error"): ${R.get_team_review_rules_severity_error.regras} regras · ~${milhar(R.get_team_review_rules_severity_error.tokens_estimados)} tokens estimados`);
   if (R.get_pr_diff) console.log(`  get_pr_diff(${PR}): ${R.get_pr_diff.arquivos.length} arquivos, ${R.get_pr_diff.linhas} linhas de diff · ~${milhar(R.get_pr_diff.tokens_estimados)} tokens estimados`);
-  console.log(`  search_team_adrs("frete"): ${R.search_team_adrs_frete.adrs} ADR · search_team_adrs("ADR-009"): ${R.search_team_adrs_adr_009.adrs} ADR`);
+  console.log(`  search_team_adrs("frete"): ${R.search_team_adrs_frete.adrs} ADR`);
   console.log('Checagens');
   for (const c of checagens) {
     const simbolo = c.ok ? '✔' : c.card === null ? '✘' : '…';

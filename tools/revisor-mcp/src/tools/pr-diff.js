@@ -13,6 +13,10 @@ const REPO = process.env.LOJA_REPO ? path.resolve(process.env.LOJA_REPO) : DEFAU
 // Por isso: nome de ref só com caracteres seguros e sem começar com "-" (Zod), a ref precisa
 // existir (rev-parse --verify) e "--" separa as revisões de qualquer caminho.
 const REF = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/;
+// Só branch de PR (feature/...) entra em revisão. Sem isso, get_pr_diff(branch="gabarito") entregaria
+// ao agente revisor a solução da sprint. A checagem fica no handler (não no schema) para o erro listar
+// as branches de PR e o inventário de tools continuar com o mesmo tamanho.
+const PR_BRANCH = /^feature\//;
 const refSchema = (exemplo) =>
   z
     .string()
@@ -59,6 +63,13 @@ export function registerPrDiffTools(server) {
       },
     },
     async ({ branch, base, max_lines }) => {
+      if (!PR_BRANCH.test(branch)) {
+        const prs = branchesLocais().filter((b) => PR_BRANCH.test(b));
+        return erro(
+          `Not a pull request branch: "${branch}". get_pr_diff only reviews branches named "feature/<name>". ` +
+            `PR branches: ${prs.join(', ') || '(none)'}.`
+        );
+      }
       const faltam = [branch, base].filter((ref) => !existe(ref));
       if (faltam.length) {
         return erro(
