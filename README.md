@@ -55,12 +55,12 @@ Copie o board do Trello para a sua conta e mova os cards. Resumo:
 | 02 | Dieta de tools: o `.mcp.json` com o servidor enxuto (até 12 tools) e medir de novo | Essencial |
 | 03 | Tool como spec: `get_team_review_rules` devolve erro informativo para time inexistente | Essencial |
 | 04 | Prompt seguro: um prompt de revisão que trata o diff como dado, e a revisão do `feature/frete-gratis` registrada com `log_review` | Essencial |
-| 05 | Intermediária: uma tool em três frases (feito na aula ao vivo) | Intermediária |
+| 05 | Intermediária: uma tool em três frases (autocorreção; não é feita na aula) | Intermediária |
 | 06 | Desafio em 3 níveis, no seu repositório ou no `loja-legado` | Desafio |
 
 Cada card termina com `npm run conferir -- NN` (por exemplo `npm run conferir -- 03`): ✔ feito, ✘ falta, … depende de outro card. É feedback, não nota: nada ali usa LLM, e do seu `.env` ele só lê a `PAGAMENTO_API_KEY`, sem imprimir, para procurar vazamento no registro das revisões.
 
-As tarefas essenciais são as que o professor resolve ao vivo na quinta. Tente antes: a aula rende muito mais quando você já esbarrou no problema.
+As tarefas essenciais (01 a 04) são as que o professor resolve ao vivo na quinta; a Intermediária e o Desafio ficam com você. Tente antes: a aula rende muito mais quando você já esbarrou no problema.
 
 ## Branches
 
@@ -76,7 +76,7 @@ Por pull request neste repositório, até a sexta que fecha a sprint:
 2. Crie `entregas/<seu-usuario>.md` a partir de `entregas/TEMPLATE.md` (apague os níveis que não fez). Fez no `loja-legado`? O código vai na mesma PR. Fez no repositório do seu time? Só o relatório, sem código.
 3. Abra a PR para a `main` com o título `[Desafio S2] <seu-usuario> · N1 N2 N3` (só os níveis que fez).
 
-A PR não é mergeada: fica aberta como vitrine da turma. Quem terminar antes da aula pode mostrar ao vivo, se der tempo.
+A PR não é mergeada: fica aberta como vitrine da turma.
 
 **Privacidade:** a PR é pública. Não coloque nela código, métricas, políticas ou nomes internos da sua empresa: anonimize ou use o `loja-legado`; na dúvida, deixe de fora. Não rode código da empresa numa conta pessoal do Claude sem autorização do seu time de segurança.
 
