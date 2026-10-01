@@ -270,5 +270,5 @@ for (const c of escolhidos) {
   }
 }
 console.log(`\nResumo: ${total.ok} ✔ · ${total.falha} ✘ · ${total.pendente} … (${((Date.now() - inicio) / 1000).toFixed(1).replace('.', ',')} s)`);
-if (!estrito) console.log('Dúvida ou travou? Poste esta saída no Discord da turma (checkpoint do dia 5).');
+if (!estrito) console.log('Travou? Cada card do Trello tem Dica 1, Dica 2 e Gabarito (checkpoint do dia 5). Corrija e rode de novo.');
 process.exit(estrito && total.falha > 0 ? 1 : 0);

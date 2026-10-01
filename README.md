@@ -10,7 +10,7 @@ Este é o repositório do projeto prático da Sprint 2. A loja (Vendure 3.7, SQL
 | Curso base na Alura | [Engenharia de software na era da IA: MCP servers, tools e integrações para agentes de IA](https://cursos.alura.com.br/course/ia-mcp-servers-tools-integracao) (18h estimadas; a seção de Supabase é opcional para este projeto) |
 | Lançamento | segunda, 05/10/2026 |
 | Aula ao vivo | quinta, 15/10/2026, 9h–10h |
-| Entrega do Desafio | sexta, 16/10/2026, no Discord da turma |
+| Entrega do Desafio | sexta, 16/10/2026, por pull request neste repositório (veja `entregas/TEMPLATE.md`) |
 
 ## Preparar o ambiente
 
@@ -29,7 +29,7 @@ claude            # abre o agente; aprove o servidor MCP "revisor" quando ele pe
 
 Só quer a parte de MCP? `npm run setup` instala o `tools/revisor-mcp` mesmo sem o `npm install` da loja (ele avisa no fim que a loja falta). Sem a loja, porém, `npm test` falha e o stop-gate da Sprint 1 segura o fim de cada turno do `claude`.
 
-`npm run inspector` dentro de `tools/revisor-mcp` abre o MCP Inspector no navegador (baixa na primeira vez). Com a loja no ar (`npm run dev`): `http://localhost:3000/dashboard` é o admin (superadmin / superadmin). Se o `better-sqlite3` não compilar na sua máquina, avise no Discord: há um plano B com `sql.js`.
+`npm run inspector` dentro de `tools/revisor-mcp` abre o MCP Inspector no navegador (baixa na primeira vez). Com a loja no ar (`npm run dev`): `http://localhost:3000/dashboard` é o admin (superadmin / superadmin). Se o `better-sqlite3` não compilar na sua máquina, abra uma issue neste repositório: há um plano B com `sql.js`.
 
 ## Medir o inventário de tools (por que existe `.claude/settings.demo-inchado.json`)
 
@@ -70,7 +70,15 @@ As tarefas essenciais são as que o professor resolve ao vivo na quinta. Tente a
 
 ## Como entregar o Desafio
 
-Poste no Discord da turma até a sexta que fecha a sprint, com o template do card "Como entregar" no Trello. Quem terminar antes da aula pode mostrar ao vivo, se der tempo.
+Por pull request neste repositório, até a sexta que fecha a sprint:
+
+1. Faça fork e crie a branch `desafio/<seu-usuario>`.
+2. Crie `entregas/<seu-usuario>.md` a partir de `entregas/TEMPLATE.md` (apague os níveis que não fez). Fez no `loja-legado`? O código vai na mesma PR. Fez no repositório do seu time? Só o relatório, sem código.
+3. Abra a PR para a `main` com o título `[Desafio S2] <seu-usuario> · N1 N2 N3` (só os níveis que fez).
+
+A PR não é mergeada: fica aberta como vitrine da turma. Quem terminar antes da aula pode mostrar ao vivo, se der tempo.
+
+**Privacidade:** a PR é pública. Não coloque nela código, métricas, políticas ou nomes internos da sua empresa: anonimize ou use o `loja-legado`; na dúvida, deixe de fora. Não rode código da empresa numa conta pessoal do Claude sem autorização do seu time de segurança.
 
 ## Licença
 
