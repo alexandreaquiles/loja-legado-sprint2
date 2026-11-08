@@ -15,7 +15,8 @@ export function registerReviewRulesTools(server) {
       description:
         'Retrieves the ACTIVE code review rules of a team. ' +
         'Use this when reviewing a PR to know which standards the team enforces. ' +
-        'Returns rules with category and severity; "error" = must fix (blocks the PR), "warning" = should fix, "info" = nice to have.',
+        'Returns rules with category and severity; "error" = must fix (blocks the PR), "warning" = should fix, "info" = nice to have. ' +
+        'An unknown team_id returns an error listing the valid teams; an empty list means no rule matches the filters.',
       inputSchema: {
         team_id: z.string().min(1).describe('Team identifier (e.g. "loja").'),
         category: z
@@ -30,8 +31,24 @@ export function registerReviewRulesTools(server) {
       },
     },
     async ({ team_id, category, severity, limit }) => {
+      const all = listRules();
+      // Time vem de todas as regras (ativas ou não): time sem regra ativa é válido e devolve lista vazia.
+      const teams = [...new Set(all.map((r) => r.team_id))].sort();
+      if (!teams.includes(team_id)) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text:
+                `Unknown team_id: "${team_id}". Valid teams: ${teams.join(', ') || '(none)'}. ` +
+                'Call get_team_review_rules again with team_id set to one of the valid teams.',
+            },
+          ],
+        };
+      }
       const order = { error: 0, warning: 1, info: 2 };
-      const rules = listRules()
+      const rules = all
         .filter((r) => r.team_id === team_id && r.active)
         .filter((r) => !category || r.category === category)
         .filter((r) => !severity || r.severity === severity)

@@ -4,7 +4,10 @@ import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
+// REVISOR_DATA_DIR: o teste da trifecta (scripts/trifecta.mjs) usa uma cópia envenenada de data/ sem tocar na original.
+const DATA_DIR = process.env.REVISOR_DATA_DIR
+  ? path.resolve(process.env.REVISOR_DATA_DIR)
+  : path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 // REVISOR_HISTORY_FILE: o smoke usa um arquivo temporário para não sujar o histórico da demo.
 const HISTORY = process.env.REVISOR_HISTORY_FILE
   ? path.resolve(process.env.REVISOR_HISTORY_FILE)

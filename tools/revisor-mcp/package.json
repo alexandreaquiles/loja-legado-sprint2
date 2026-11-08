@@ -9,7 +9,8 @@
     "inspector": "npx @modelcontextprotocol/inspector node src/index.js",
     "inspector:inchado": "npx @modelcontextprotocol/inspector node src/index-inchado.js",
     "smoke": "node scripts/smoke.mjs",
-    "reset-history": "node scripts/reset-history.mjs"
+    "reset-history": "node scripts/reset-history.mjs",
+    "trifecta": "node scripts/trifecta.mjs"
   },
   "license": "MIT",
   "dependencies": {

@@ -1,0 +1,20 @@
+{
+  "name": "catalogo-mcp",
+  "version": "1.0.0",
+  "description": "MCP server somente leitura que dá ao agente o catálogo da loja (variantes, SKUs e preços em centavos) do vendure.sqlite",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "inspector": "npx @modelcontextprotocol/inspector node src/index.js",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
+  }
+}

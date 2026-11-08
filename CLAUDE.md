@@ -10,3 +10,5 @@
 
 - `tools/revisor-mcp/` é o servidor MCP `revisor` (stdio, dados em `data/*.json`): regras de revisão, ADRs e histórico de reviews do time `loja`. O `.mcp.json` escolhe a versão (`src/index-inchado.js` ou `src/index.js`). Depois de mudar o `.mcp.json`, saia e abra o `claude` de novo.
 - `npm run smoke` sobe o servidor sem LLM, chama as tools e imprime os tokens estimados; `npm run conferir -- NN` confere um card.
+- `tools/catalogo-mcp/` é o servidor MCP `catalogo` (stdio, somente leitura sobre o `vendure.sqlite`): variantes, SKUs e preços em centavos do canal padrão. Use `count_variants_by_price` para medir o impacto de um valor mínimo de promoção e `search_catalog_variants` para exemplos reais em testes. Não leia o `vendure.sqlite` por outro caminho. PRD em `docs/prd-catalogo-mcp.md`; `npm --prefix tools/catalogo-mcp run smoke` testa sem LLM.
+- Os conectores do claude.ai ficam desligados neste projeto (`disableClaudeAiConnectors` no `.claude/settings.json`): o agente vê só os 7 tools de `revisor` e `catalogo`.

@@ -1,4 +1,5 @@
 {
+  "disableClaudeAiConnectors": true,
   "permissions": {
     "deny": [
       "Read(./.env)",
@@ -13,6 +14,15 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__revisor__log_review",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/no-secret-in-log.mjs"
           }
         ]
       }
